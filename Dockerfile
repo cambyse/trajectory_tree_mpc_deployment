@@ -26,24 +26,52 @@ RUN apt update && apt install -y git build-essential \
  libgtest-dev \
  libopencv-dev \
  libboost-all-dev \
- cmake
-    
-WORKDIR /tamp
-COPY requirements.txt .
+ cmake \
+ curl \
+ git-lfs
+ 
+# Install ROS
+RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" | tee /etc/apt/sources.list.d/ros-latest.list
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+RUN apt update
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt install -y ros-noetic-desktop gazebo11 ros-noetic-gazebo-ros-pkgs ros-noetic-gazebo-ros-control
+
+ENV DEBIAN_FRONTEND=dialog
+
+RUN mkdir -p /catkin_ws/src
+WORKDIR /catkin_ws
+RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
+WORKDIR /catkin_ws/src
+
+# Clone OSQP
+RUN mkdir -p /osqp
+WORKDIR /osqp
+RUN git clone https://github.com/osqp/osqp
+WORKDIR /osqp/osqp
+RUN git checkout v0.6.2
+RUN git submodule update --init --recursive
+RUN mkdir -p build
+WORKDIR /osqp/osqp/build
+RUN cmake -G "Unix Makefiles" ..
+RUN cmake --build .
+RUN cmake --build . --target install
 
 # Clone projects
-RUN git clone https://github.com/cambyse/trajectory_tree_tamp.git trajectory_tree_tamp && cd trajectory_tree_tamp
-WORKDIR /tamp/trajectory_tree_tamp
+WORKDIR /catkin_ws/src
+RUN git clone https://github.com/cambyse/trajectory_tree_mpc.git
+WORKDIR /catkin_ws/src/trajectory_tree_mpc
 RUN git submodule update --init --recursive
 
 # Build Rai
-WORKDIR /tamp/trajectory_tree_tamp/rai
+WORKDIR /catkin_ws/src/trajectory_tree_mpc/control_tree_car/externals/rai
 RUN make
 
-# Build TAMP lib and examples
-WORKDIR /tamp/trajectory_tree_tamp/share/projects
-RUN mkdir 17-camille-obsTask_build
-WORKDIR /tamp/trajectory_tree_tamp/share/projects/17-camille-obsTask_build
-RUN cmake ../17-camille-obsTask -DMLR_LIBRARIES_DIR=/tamp/trajectory_tree_tamp/rai/lib -DMLR_INCLUDE_DIR=/tamp/trajectory_tree_tamp/rai/rai -DCMAKE_BUILD_TYPE=Release
-RUN make
+# Build ros nodes
+WORKDIR /catkin_ws
+RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
+
+# Install gazebo models
 
