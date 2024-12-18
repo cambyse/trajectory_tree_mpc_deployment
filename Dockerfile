@@ -74,4 +74,9 @@ WORKDIR /catkin_ws
 RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 
 # Install gazebo models
+WORKDIR /catkin_ws/src/trajectory_tree_mpc/lgp_car_models
+RUN mkdir -p ~/.gazebo/models
+RUN cp -r * ~/.gazebo/models
+
+WORKDIR /catkin_ws
 
